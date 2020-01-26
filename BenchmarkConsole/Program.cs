@@ -7,15 +7,36 @@ namespace BenchmarkConsole
     {
         static void Main(string[] args)
         {
-            // アンマネージドメモリの確保
-            //BenchmarkRunner.Run<AllocateMemory>();
+#if false
+            /*
+             * アンマネージドメモリの確保
+             */
+            BenchmarkRunner.Run<AllocateMemory>();
+#endif
 
-            // マネージドからアンマネージドへのメモリコピー
+#if false
+            /* 
+             * マネージドからアンマネージドへのメモリコピー
+             */
+#if DEBUG
+            using var mem = new MemCopyMaToUnma();
+            mem.TestMethods();
+#else
             BenchmarkRunner.Run<MemCopyMaToUnma>();
+#endif
+#endif
 
-            //using var mem = new MemCopyMaToUnma();
-            //mem.TestMethods();
-
+#if true
+            /* 
+             * アンマネージドからアンマネージドへのメモリコピー
+             */
+#if DEBUG
+            using var mem = new MemCopyUnmaToUnma();
+            mem.TestMethods();
+#else
+            BenchmarkRunner.Run<MemCopyUnmaToUnma>();
+#endif
+#endif
 
         }
     }
