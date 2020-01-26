@@ -6,6 +6,12 @@ using System.Diagnostics;
 
 namespace BenchmarkConsole
 {
+    /*
+     * マネージドメモリ(byte[]) から アンマネージドメモリ(IntPtr) へのコピー
+     * 
+     * 高速なのは UnsafePInvokeRtlMoveMemory() だけど、
+     * unsafe 無しならベタに MarshalCopy() が良さげ。
+     */
 #if false
 |                     Method |     Mean |     Error |    StdDev |
 |--------------------------- |---------:|----------:|----------:|
@@ -28,53 +34,30 @@ namespace BenchmarkConsole
         private readonly IntPtr _dstPtr;
         private readonly ulong _answer;
 
-#region APIs
+        #region APIs
         [DllImport("kernel32.dll", EntryPoint = "CopyMemory", SetLastError = false)]
         private static extern void CopyMemory(IntPtr dst, IntPtr src, uint size);
 
         [DllImport("kernel32.dll", EntryPoint = "RtlMoveMemory", SetLastError = false)]
-        private static extern void RtlMoveMemory(IntPtr dest, IntPtr src, [MarshalAs(UnmanagedType.U4)] int Length);
+        private static extern void RtlMoveMemory(IntPtr dst, IntPtr src, [MarshalAs(UnmanagedType.U4)] int length);
 
         [DllImport("msvcrt.dll", EntryPoint = "memcpy", SetLastError = false)]
         private static extern IntPtr memcpy(IntPtr dst, IntPtr src, UIntPtr count);
-#endregion
+        #endregion
 
         public MemCopyMaToUnma()
         {
             _srcArray = new byte[AllocSize];
-            for (int i = 0; i < AllocSize; i++)
+            for (int i = 0; i < AllocSize; ++i)
             {
                 _srcArray[i] = (byte)(i & 0xff);
             }
 
             ulong sum = 0;
-            for (int i = 0; i < AllocSize; i++)
-            {
-                sum += _srcArray[i];
-            }
+            for (int i = 0; i < AllocSize; ++i) sum += _srcArray[i];
             _answer = sum;
 
             _dstPtr = Marshal.AllocCoTaskMem(AllocSize);
-        }
-
-        private unsafe void CheckAnswer(Action action)
-        {
-            action.Invoke();
-            Debug.Assert(_answer == GetSum(_dstPtr, AllocSize));
-
-            Unsafe.InitBlock(_dstPtr.ToPointer(), 0, AllocSize);
-            Debug.Assert(0 == GetSum(_dstPtr, AllocSize));
-
-            static unsafe ulong GetSum(IntPtr intPtr, int size)
-            {
-                byte* head = (byte*)intPtr.ToPointer();
-                byte* tail = head + size;
-                ulong sum = 0;
-                while (head < tail)
-                    sum += *(head++);
-
-                return sum;
-            }
         }
 
         public void TestMethods()
@@ -89,10 +72,30 @@ namespace BenchmarkConsole
             //CheckAnswer(UnsafePInvokeKernelCopy);
             CheckAnswer(UnsafePInvokeRtlMoveMemory);
             CheckAnswer(UnsafePInvokeMemcpy);
+
+            unsafe void CheckAnswer(Action action)
+            {
+                action.Invoke();
+                Debug.Assert(_answer == GetSum(_dstPtr, AllocSize));
+
+                Unsafe.InitBlock(_dstPtr.ToPointer(), 0, AllocSize);
+                Debug.Assert(0 == GetSum(_dstPtr, AllocSize));
+
+                static unsafe ulong GetSum(IntPtr intPtr, int size)
+                {
+                    byte* head = (byte*)intPtr.ToPointer();
+                    byte* tail = head + size;
+                    ulong sum = 0;
+                    while (head < tail)
+                        sum += *(head++);
+
+                    return sum;
+                }
+            }
         }
 
         [Benchmark]
-        public void MarshalCopy()
+        public unsafe void MarshalCopy()
         {
             Marshal.Copy(_srcArray, 0, _dstPtr, AllocSize);
         }
@@ -160,8 +163,7 @@ namespace BenchmarkConsole
         {
             fixed (void* src = _srcArray)
             {
-                var srcPtr = new IntPtr(src);
-                CopyMemory(_dstPtr, srcPtr, AllocSize);
+                CopyMemory(_dstPtr, (IntPtr)src, AllocSize);
             }
         }
 #endif
@@ -171,8 +173,7 @@ namespace BenchmarkConsole
         {
             fixed (void* src = _srcArray)
             {
-                var srcPtr = new IntPtr(src);
-                RtlMoveMemory(_dstPtr, srcPtr, AllocSize);
+                RtlMoveMemory(_dstPtr, (IntPtr)src, AllocSize);
             }
         }
 
@@ -181,9 +182,7 @@ namespace BenchmarkConsole
         {
             fixed (void* src = _srcArray)
             {
-                var srcPtr = new IntPtr(src);
-                var size = new UIntPtr(AllocSize);
-                memcpy(_dstPtr, srcPtr, size);
+                memcpy(_dstPtr, (IntPtr)src, (UIntPtr)AllocSize);
             }
         }
 

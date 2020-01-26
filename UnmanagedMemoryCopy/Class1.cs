@@ -2,7 +2,7 @@
 
 namespace UnmanagedMemoryCopy
 {
-    public class AllocateUnmanagedMemory
+    public class Class1
     {
     }
 }

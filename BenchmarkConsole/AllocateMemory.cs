@@ -4,6 +4,14 @@ using System.Runtime.InteropServices;
 
 namespace BenchmarkConsole
 {
+    /*
+     * アンマネージドメモリ(IntPtr) の確保
+     * 
+     * 測定結果は僅かに AllocCoTaskMem() が早いけど、ほぼ同じ。
+     * 互換性の観点から AllocCoTaskMem() の方が良いっぽい。
+     * https://qiita.com/Nuits/items/9dc67cb12e2dcf8d09bd
+     * 
+     */
 #if false
 |         Method |     Mean |    Error |  StdDev |
 |--------------- |---------:|---------:|--------:|
